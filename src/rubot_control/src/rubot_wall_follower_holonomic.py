@@ -24,16 +24,16 @@ def clbk_laser(msg):
             scanRangesLengthCorrectionFactor = len(msg.ranges) / 360
             isScanRangesLengthCorrectionFactorCalculated = True
 
-    front_min= int(0 * scanRangesLengthCorrectionFactor)
-    front_max = int(30 * scanRangesLengthCorrectionFactor)
-    fright_min = int(270 * scanRangesLengthCorrectionFactor)
-    fright_max = int(330 * scanRangesLengthCorrectionFactor)
-    right_min = int(240 * scanRangesLengthCorrectionFactor)
-    right_max = int(300 * scanRangesLengthCorrectionFactor)
-    bright_min = int(210 * scanRangesLengthCorrectionFactor)
-    bright_max = int(240 * scanRangesLengthCorrectionFactor)
-    back_min= int(150 * scanRangesLengthCorrectionFactor)
-    back_max = int(210 * scanRangesLengthCorrectionFactor)
+    back_min= int(0 * scanRangesLengthCorrectionFactor)
+    back_max = int(30 * scanRangesLengthCorrectionFactor)
+    bright_min = int(30 * scanRangesLengthCorrectionFactor)
+    bright_max = int(60 * scanRangesLengthCorrectionFactor)
+    right_min = int(60 * scanRangesLengthCorrectionFactor)
+    right_max = int(120 * scanRangesLengthCorrectionFactor)
+    fright_min = int(120 * scanRangesLengthCorrectionFactor)
+    fright_max = int(150 * scanRangesLengthCorrectionFactor)
+    front_min= int(150 * scanRangesLengthCorrectionFactor)
+    front_max = int(210 * scanRangesLengthCorrectionFactor)
 
     regions = {
         'bright':  min(min(msg.ranges[bright_min:bright_max]), 3),
@@ -77,6 +77,7 @@ def take_action(regions):
     else:
         state_description = 'case 6 - Far'
         linear_x = vx
+        linear_y = -vy
 
     rospy.loginfo(state_description)
     msg.linear.x = linear_x
