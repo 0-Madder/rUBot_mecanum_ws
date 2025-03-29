@@ -5,7 +5,7 @@ import numpy as np
 from sensor_msgs.msg import LaserScan
 from geometry_msgs.msg import Twist
 
-class SimpleNavigator:
+class WallFollower:
     def __init__(self):
         rospy.init_node("simple_nav")
 
@@ -33,15 +33,21 @@ class SimpleNavigator:
         ranges = np.array(scan.ranges)
         ranges[np.isinf(ranges)] = 999  # Replace inf values with a large number
 
+        sector = len(ranges)//8
+
         # Divide the ranges into left and right
-        fright_ranges = ranges[len(ranges)//4:len(ranges)//2]
-        bright_ranges = ranges[0:len(ranges)//4]
-        bleft_ranges = ranges[(len(ranges)//4)*3:]
-        fleft_ranges = ranges[len(ranges)//2:(len(ranges)//4)*3]
+        fright_ranges = ranges[(3 * sector):(4 * sector)]
+        right_ranges = ranges[sector:(3 * sector)]
+        bright_ranges = ranges[0:sector]
+        bleft_ranges = ranges[(7 * sector):]
+        left_ranges = ranges[(5 * sector):(7 * sector)]
+        fleft_ranges = ranges[(4 * sector):(5 * sector)]
 
         self.fright_distance = np.min(fright_ranges)
+        self.right_distance = np.min(right_ranges)
         self.bright_distance = np.min(bright_ranges)
         self.bleft_distance = np.min(bleft_ranges)
+        self.left_distance = np.min(left_ranges)
         self.fleft_distance = np.min(fleft_ranges)
 
         
@@ -50,17 +56,25 @@ class SimpleNavigator:
 
     def compute_min_distance(self):
         # Determine which side has the closest object
-        if self.fright_distance < self.bright_distance and self.fright_distance < self.bleft_distance and self.fright_distance < self.fleft_distance:
+        if self.fright_distance < self.right_distance and self.fright_distance < self.bright_distance and self.fright_distance < self.bleft_distance and self.fright_distance < self.left_distance and self.fright_distance < self.fleft_distance:
             self.closest_distance = self.fright_distance
             self.closest_side = 'fright'
 
-        elif self.bright_distance < self.bleft_distance and self.bright_distance < self.fleft_distance:
+        elif self.right_distance < self.bright_distance and self.right_distance < self.bleft_distance and self.right_distance < self.left_distance and self.right_distance < self.fleft_distance:
+            self.closest_distance = self.right_distance
+            self.closest_side = 'right'
+
+        elif self.bright_distance < self.bleft_distance and self.bright_distance < self.left_distance and self.bright_distance < self.fleft_distance:
             self.closest_distance = self.bright_distance
             self.closest_side = 'bright'
 
-        elif self.bleft_distance <  self.fleft_distance:
+        elif self.bleft_distance < self.left_distance and self.bleft_distance <  self.fleft_distance:
             self.closest_distance = self.bleft_distance
             self.closest_side = 'bleft'
+
+        elif self.left_distance < self.fleft_distance:
+            self.closest_distance = self.left_distance
+            self.closest_side = 'left'
         else:
             self.closest_distance = self.fleft_distance
             self.closest_side = 'fleft'
@@ -97,5 +111,5 @@ class SimpleNavigator:
             self.rate.sleep()
 
 if __name__ == "__main__":
-    node = SimpleNavigator()
+    node = WallFollower()
     node.run()
