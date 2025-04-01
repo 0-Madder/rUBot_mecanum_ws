@@ -1,6 +1,6 @@
 <launch>
  <!-- Navigation Program  -->
-    <arg name="safe_distance" default="0.2" />
+    <arg name="safe_distance" default="0.9" />
     <arg name="max_distance" default="0.6" />
     <arg name="speed_factor" default="1" />
     <arg name="rotation_speed" default="0.35" />
