@@ -1,5 +1,6 @@
-0 Forbidden
-1 Turn Left
-2 STOP
-3 Turn Right
-4 GiveWay
+0 Forbidden_Direction
+1 Give_Way
+2 Turn_Left
+3 Nothing
+4 Turn_Right
+5 Stop
