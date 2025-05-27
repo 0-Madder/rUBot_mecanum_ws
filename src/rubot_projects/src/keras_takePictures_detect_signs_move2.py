@@ -86,14 +86,18 @@ class SignalBehaviorNode:
 
         self.robot_x = 0.0
         self.robot_y = 0.0
-        self.current_command = "Nothing"
-        self.command_lock = threading.Lock()
+        self.signal_detected = "Nothing"
+        self.signal_position = None
+        self.signal_time = rospy.Time.now()
+
+        self.detection_distance_threshold = 0.4  # metros
+        self.detection_timeout = rospy.Duration(5.0)  # temps durant el qual és vàlida una senyal
 
         self.cmd_vel_pub = rospy.Publisher("/cmd_vel", Twist, queue_size=1)
         rospy.Subscriber("/odom", Odometry, self.odom_callback)
         rospy.Subscriber("/predicted_class", String, self.class_callback)
 
-        # Hilo que mantiene el movimiento según la señal detectada
+        self.command_lock = threading.Lock()
         self.control_thread = threading.Thread(target=self.motion_loop)
         self.control_thread.daemon = True
         self.control_thread.start()
@@ -106,40 +110,62 @@ class SignalBehaviorNode:
 
     def class_callback(self, msg):
         with self.command_lock:
-            self.current_command = msg.data
-            rospy.loginfo(f"[Comportamiento] Señal detectada: {self.current_command}")
+            class_name = msg.data
+
+            # Registrar posición ficticia de la señal 0.5m delante
+            self.signal_detected = class_name
+            self.signal_time = rospy.Time.now()
+            self.signal_position = (self.robot_x + 0.5, self.robot_y)
+
+            rospy.loginfo(f"[Comportamiento] Señal detectada: {class_name} en ({self.signal_position[0]:.2f}, {self.signal_position[1]:.2f})")
 
     def motion_loop(self):
-        rate = rospy.Rate(10)  # 10 Hz
+        rate = rospy.Rate(10)
         while not rospy.is_shutdown():
             twist = Twist()
             with self.command_lock:
-                cmd = self.current_command
+                cmd = self.signal_detected
+                sig_time = self.signal_time #moment en el que es detecta la senyal
+                sig_pos = self.signal_position #(x,y) posició del robot quan detecta la senyal
 
-            if cmd in ["Stop", "Give_Way"]:
-                twist.linear.x = 0.0
-                twist.angular.z = 0.0
-                rospy.loginfo_throttle(2.0, f"[Comportamiento] Acción: PARAR por señal '{cmd}'")
-            elif cmd == "Turn_Left":
-                twist.linear.x = 0.0
-                twist.angular.z = 0.5
-                rospy.loginfo_throttle(2.0, f"[Comportamiento] Acción: GIRAR IZQUIERDA")
-            elif cmd == "Turn_Right":
-                twist.linear.x = 0.0
-                twist.angular.z = -0.5
-                rospy.loginfo_throttle(2.0, f"[Comportamiento] Acción: GIRAR DERECHA")
-            elif cmd == "Nothing":
+            if rospy.Time.now() - sig_time > self.detection_timeout: #Si el temps que ha passat desde que s'ha detectat l'última senyal  es major que el maxim temps de processarment s'una sneyal, continuem amb NOthing (linia recta) fins que en detectem una altra.
+                # Expirar señal
+                cmd = "Nothing"
+                sig_pos = None
+
+            if sig_pos is not None:
+                distance = np.sqrt((self.robot_x - sig_pos[0])**2 + (self.robot_y - sig_pos[1])**2)
+                rospy.loginfo_throttle(2.0, f"[Comportamiento] Distancia a señal '{cmd}': {distance:.2f} m")
+
+                if distance <= self.detection_distance_threshold:
+                    if cmd in ["Stop", "Give_Way"]:
+                        twist.linear.x = 0.0
+                        twist.angular.z = 0.0
+                        rospy.loginfo_throttle(2.0, f"[Comportamiento] PARAR por señal '{cmd}'")
+                    elif cmd == "Turn_Left":
+                        twist.linear.x = 0.0
+                        twist.angular.z = 0.5
+                        rospy.loginfo_throttle(2.0, "[Comportamiento] GIRAR IZQUIERDA")
+                    elif cmd == "Turn_Right":
+                        twist.linear.x = 0.0
+                        twist.angular.z = -0.5
+                        rospy.loginfo_throttle(2.0, "[Comportamiento] GIRAR DERECHA")
+                    else:
+                        twist.linear.x = 0.2
+                        twist.angular.z = 0.0
+                else:
+                    # Aún no estamos suficientemente cerca
+                    twist.linear.x = 0.2
+                    twist.angular.z = 0.0
+                    rospy.loginfo_throttle(2.0, "[Comportamiento] AVANZAR hacia la señal...")
+            else:
+                # Nada detectado o señal expirada
                 twist.linear.x = 0.2
                 twist.angular.z = 0.0
-                rospy.loginfo_throttle(2.0, "[Comportamiento] Acción: AVANZAR (Nada detectado)")
-            else:
-                twist.linear.x = 0.0
-                twist.angular.z = 0.0
-                rospy.loginfo_throttle(2.0, f"[Comportamiento] Señal desconocida: '{cmd}'")
+                rospy.loginfo_throttle(2.0, "[Comportamiento] AVANZAR (Nada detectado)")
 
             self.cmd_vel_pub.publish(twist)
             rate.sleep()
-
 
 if __name__ == "__main__":
     rospy.init_node("keras_takePictures_detect_signs_move2", anonymous=True)
